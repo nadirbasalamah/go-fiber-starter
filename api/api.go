@@ -4,6 +4,7 @@ import (
 	"go-fiber-starter/api/handlers"
 	"go-fiber-starter/api/middlewares"
 	"go-fiber-starter/auth"
+	"go-fiber-starter/pkg/fileupload"
 	"go-fiber-starter/users"
 
 	"github.com/cloudinary/cloudinary-go/v2"
@@ -17,13 +18,14 @@ import (
 
 func NewApp(repository *gorm.DB, cld *cloudinary.Cloudinary, jwtConfig middlewares.JWTConfig) *fiber.App {
 	var (
-		app = fiber.New()
+		app      = fiber.New()
+		uploader = fileupload.InitUploader(cld)
 
 		authService = auth.New(repository)
 		userService = users.New(repository)
 
 		authHandler  = handlers.NewAuth(authService, jwtConfig)
-		usersHandler = handlers.NewUsers(userService, cld)
+		usersHandler = handlers.NewUsers(userService, uploader)
 	)
 
 	logger, _ := zap.NewProduction()

@@ -11,6 +11,11 @@ const (
 )
 
 const (
+	JWT_EXPIRE_DURATION = "JWT_EXPIRE_DURATION"
+	JWT_SECRET_KEY      = "JWT_SECRET_KEY"
+)
+
+const (
 	ADMIN_USERNAME    = "ADMIN_USERNAME"
 	ADMIN_EMAIL       = "ADMIN_EMAIL"
 	ADMIN_PASSWORD    = "ADMIN_PASSWORD"
@@ -36,3 +41,7 @@ var ALLOWED_EXTENSIONS map[string]bool = map[string]bool{
 	".jpg":  true,
 	".jpeg": true,
 }
+
+const (
+	RESOURCE_IMAGE = "image"
+)

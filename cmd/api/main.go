@@ -38,14 +38,14 @@ func main() {
 		CloudinaryURL: utils.GetConfig(constant.CLOUDINARY_URL),
 	}
 
-	expireDuration, err := strconv.Atoi(utils.GetConfig("JWT_EXPIRE_DURATION"))
+	expireDuration, err := strconv.Atoi(utils.GetConfig(constant.JWT_EXPIRE_DURATION))
 
 	if err != nil {
 		log.Fatalf("error when parsing expire duration: %v\n", err)
 	}
 
 	jwtConfig := middlewares.JWTConfig{
-		SecretKey:       utils.GetConfig("JWT_SECRET_KEY"),
+		SecretKey:       utils.GetConfig(constant.JWT_SECRET_KEY),
 		ExpiresDuration: expireDuration,
 	}
 

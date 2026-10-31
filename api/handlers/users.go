@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"go-fiber-starter/api/middlewares"
+	"go-fiber-starter/pkg/constant"
 	"go-fiber-starter/pkg/dtos"
 	"go-fiber-starter/pkg/fileupload"
 	"go-fiber-starter/pkg/utils"
@@ -10,14 +11,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/gofiber/fiber/v3"
 )
 
 type Users struct {
-	users usersPkg.Service
-	cld   *cloudinary.Cloudinary
+	users    usersPkg.Service
+	uploader fileupload.Uploader
 }
 
 func (u Users) GetProfile(ctx fiber.Ctx) error {
@@ -73,41 +73,59 @@ func (u Users) EditProfile(ctx fiber.Ctx) error {
 		})
 	}
 
+	userRecord, err := u.users.GetProfile(ctx.Context(), uint(userID))
+
+	if err != nil {
+		return ctx.Status(http.StatusNotFound).JSON(dtos.Response[any]{
+			Status:  "failed",
+			Message: "user not found",
+		})
+	}
+
 	file, err := ctx.FormFile("file")
-	if err != nil {
-		return ctx.Status(http.StatusUnprocessableEntity).JSON(dtos.Response[any]{
-			Status:  "failed",
-			Message: "file not found",
-		})
+
+	if file != nil {
+		if err != nil {
+			return ctx.Status(http.StatusUnprocessableEntity).JSON(dtos.Response[any]{
+				Status:  "failed",
+				Message: "file not found",
+			})
+		}
+
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+
+		isFileValid := utils.ValidateFile(ext)
+
+		if !isFileValid {
+			return ctx.Status(http.StatusUnprocessableEntity).JSON(dtos.Response[any]{
+				Status:  "failed",
+				Message: "invalid file format",
+			})
+		}
+
+		resp, err := u.uploader.UploadFile(ctx.Context(), file, uploader.UploadParams{})
+
+		if err != nil {
+			return ctx.Status(http.StatusInternalServerError).JSON(dtos.Response[any]{
+				Status:  "failed",
+				Message: "upload failed",
+			})
+		}
+
+		editReq.ProfilePicture = resp.SecureURL
+		editReq.ProfilePictureID = resp.PublicID
+
+		if _, err := u.uploader.DeleteFile(ctx.Context(), userRecord.ProfilePictureID, constant.RESOURCE_IMAGE, uploader.UploadParams{}); err != nil {
+			return ctx.Status(http.StatusInternalServerError).JSON(dtos.Response[any]{
+				Status:  "update failed",
+				Message: "old file failed to delete",
+			})
+		}
+
+	} else {
+		editReq.ProfilePicture = userRecord.ProfilePicture
+		editReq.ProfilePictureID = userRecord.ProfilePictureID
 	}
-
-	ext := strings.ToLower(filepath.Ext(file.Filename))
-
-	isFileValid := utils.ValidateFile(ext)
-
-	if !isFileValid {
-		return ctx.Status(http.StatusUnprocessableEntity).JSON(dtos.Response[any]{
-			Status:  "failed",
-			Message: "invalid file format",
-		})
-	}
-
-	uploaderCfg := fileupload.CloudinaryUploader{
-		Cld:     u.cld,
-		File:    file,
-		Options: uploader.UploadParams{},
-	}
-
-	fileLink, err := uploaderCfg.UploadFile(ctx.Context())
-
-	if err != nil {
-		return ctx.Status(http.StatusInternalServerError).JSON(dtos.Response[any]{
-			Status:  "failed",
-			Message: "upload failed",
-		})
-	}
-
-	editReq.ProfilePicture = fileLink
 
 	user, err := u.users.Update(ctx.Context(), editReq, uint(userID))
 
@@ -125,10 +143,10 @@ func (u Users) EditProfile(ctx fiber.Ctx) error {
 	})
 }
 
-func NewUsers(users usersPkg.Service, cld *cloudinary.Cloudinary) Users {
+func NewUsers(users usersPkg.Service, uploader fileupload.Uploader) Users {
 	usersHandler := Users{
-		users: users,
-		cld:   cld,
+		users:    users,
+		uploader: uploader,
 	}
 
 	return usersHandler
